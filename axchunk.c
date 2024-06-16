@@ -12,7 +12,10 @@
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 
-static inline void *axc_index(axchunk *c, uint64_t i) {
+/**
+ * Same as axc_index, but without bounds checking.
+ */
+static inline void *axc__index__(axchunk *c, uint64_t i) {
     return (char *) c->items + i * c->width;
 }
 
@@ -63,8 +66,8 @@ axchunk *axc_swap(axchunk *c, uint64_t i1, uint64_t i2) {
         return c;
     enum {BUFSIZE = 16};
     char buf[BUFSIZE];
-    char *chunk1 = axc_index(c, i1);
-    char *chunk2 = axc_index(c, i2);
+    char *chunk1 = axc__index__(c, i1);
+    char *chunk2 = axc__index__(c, i2);
     uint64_t k = c->width;
     while (k >= BUFSIZE) {
         memcpy(buf, chunk1, BUFSIZE);
@@ -126,7 +129,7 @@ axchunk *axc_clear(axchunk *c) {
 axchunk *axc_discard(axchunk *c, uint64_t n) {
     n = c->len - MIN(c->len, n);
     if (c->destroy) {
-        for (char *chunk = axc_index(c, c->len); c->len > n; --c->len)
+        for (char *chunk = axc__index__(c, c->len); c->len > n; --c->len)
             c->destroy(chunk -= c->width);
     } else {
         c->len = n;

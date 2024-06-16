@@ -11,6 +11,9 @@
 #ifndef AXCHUNK_AXCHUNK_H
 #define AXCHUNK_AXCHUNK_H
 
+/**
+ * Same as axc_index, but without bounds checking.
+ */
 #define axc__index__(c, i) (((char *) (c)->items + (i) * (c)->width))
 
 #include <stdbool.h>
@@ -141,6 +144,15 @@ static inline uint64_t axc_width(axchunk *c) {
  */
 static inline void *axc_data(axchunk *c) {
     return c->items;
+}
+
+/**
+ * Get a pointer to the chunk at some index.
+ * @param i Index of chunk.
+ * @return Pointer to chunk or NULL if index out of range.
+ */
+static inline void *axc_index(axchunk *c, uint64_t i) {
+    return i < c->len ? (char *) c->items + i * c->width : NULL;
 }
 
 /**
