@@ -58,12 +58,14 @@ bool axc_resize(axchunk *c, uint64_t size) {
     size += !size;
     if (size == c->cap)
         return false;
+    intptr_t oldItems = (intptr_t) c->items;
     void *items = realloc(c->items, size * c->width);
     if (!items)
         return true;
+    ptrdiff_t offset = (intptr_t) items - oldItems;
     c->items = items;
     c->cap = size;
-    c->resizeEventHandler(c, c->resizeEventArgs);
+    c->resizeEventHandler(c, offset, c->resizeEventArgs);
     return false;
 }
 

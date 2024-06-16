@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stddef.h>
 
 /*
  * axchunk is chunk vector library with some functional programming concepts and utility functions included.
@@ -31,6 +32,9 @@
  * A destructor function may be supplied. There is no default destructor. The destructor is called on any chunk which
  * is irrevocably removed from the axchunk.
  *
+ * axchunk also features a resize event handler. This event handler is called whenever the internal array of an axchunk
+ * is resized and is useful to shift memory addresses that point to chunks to their new correct addresses.
+ *
  * The struct definition of axchunk is given in its header for optimisation purposes only. To use axchunk, you must
  * rely solely on the functions of the library.
  */
@@ -40,7 +44,7 @@ typedef struct axchunk {
     uint64_t cap;
     uint64_t width;
     void (*destroy)(void *);
-    void (*resizeEventHandler)(struct axchunk *, void *);
+    void (*resizeEventHandler)(struct axchunk *, ptrdiff_t, void *);
     void *resizeEventArgs;
 } axchunk;
 
@@ -178,23 +182,33 @@ static inline void (*axc_getDestructor(axchunk *c))(void *) {
 }
 
 /**
- * Set a handler to call whenever axchunk is resized.
- * @param handler Handler function taking the axchunk and optional arguments.
- * @param args Optional arguments which are passed to the handler.
+ * Set a handler to call whenever axchunk is resized. The handler function takes as arguments the affected axchunk,
+ * an offset of type ptrdiff_t and an optional argument. When resizing the internal array, the array may be copied
+ * to another position in memory. The offset parameter tells you how many bytes this new array is from the old one.
+ * @param handler Handler function taking the axchunk, the offset and optional arguments.
  * @return Self.
  */
-static inline axchunk *axc_setResizeEventHandler(axchunk *c, void (*handler)(axchunk *, void *), void *args) {
+static inline axchunk *axc_setResizeEventHandler(axchunk *c, void (*handler)(axchunk *, ptrdiff_t, void *)) {
     c->resizeEventHandler = handler;
-    c->resizeEventArgs = args;
     return c;
 }
 
 /**
  * Get this axchunk's resize event handler function.
- * @return Resize event handler of type void (*)(axchunk *, void *).
+ * @return Resize event handler of type void (*)(axchunk *, ptrdiff_t, void *).
  */
-static inline void (*axc_getResizeEventHandler(axchunk *c))(axchunk *, void *) {
+static inline void (*axc_getResizeEventHandler(axchunk *c))(axchunk *, ptrdiff_t, void *) {
     return c->resizeEventHandler;
+}
+
+/**
+ * Set this axchunk's optional argument to its resize event handler.
+ * @param args Optional arguments which are passed to the handler.
+ * @return Self.
+ */
+static inline axchunk *axc_setResizeEventArgs(axchunk *c, void *args) {
+    c->resizeEventArgs = args;
+    return c;
 }
 
 /**
