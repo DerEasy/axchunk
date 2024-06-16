@@ -5,13 +5,26 @@
 #ifndef AXCHUNK_AXCHUNK_H
 #define AXCHUNK_AXCHUNK_H
 
-#define axc_index(c, i) (((char *) (c)->items + (i) * (c)->width))
+#define axc__index__(c, i) (((char *) (c)->items + (i) * (c)->width))
 
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
+/*
+ * axchunk is chunk vector library with some functional programming concepts and utility functions included.
+ *
+ * Each chunk has a constant size ("width"). axchunk is useful if you want to avoid excessive amounts of memory
+ * allocations and memory wastage, because unlike a regular vector, which stores pointers to its objects, axchunk
+ * stores every object directly in its internal array.
+ *
+ * A destructor function may be supplied. There is no default destructor. The destructor is called on any chunk which
+ * is irrevocably removed from the axchunk.
+ *
+ * The struct definition of axchunk is given in its header for optimisation purposes only. To use axchunk, you must
+ * rely solely on the functions of the library.
+ */
 typedef struct axchunk {
     void *items;
     uint64_t len;
@@ -21,7 +34,7 @@ typedef struct axchunk {
 } axchunk;
 
 /**
- * This is an internal function to the axchunk library.
+ * This is an internal function of the axchunk library.
  */
 static inline void *axc__quick_memcpy__(void *dst, void *src, size_t n) {
     switch (n) {
@@ -36,7 +49,7 @@ static inline void *axc__quick_memcpy__(void *dst, void *src, size_t n) {
 }
 
 /**
- * This is an internal function to the axchunk library.
+ * This is an internal function of the axchunk library.
  */
 static inline void *axc__quick_memmove__(void *dst, void *src, size_t n) {
     switch (n) {
@@ -151,7 +164,7 @@ static inline void (*axc_getDestructor(axchunk *c))(void *) {
 static inline bool axc_push(axchunk *c, void *item) {
     if (c->len >= c->cap && axc_resize(c, (c->cap << 1) | 1))
         return true;
-    axc__quick_memcpy__(axc_index(c, c->len++), item, c->width);
+    axc__quick_memcpy__(axc__index__(c, c->len++), item, c->width);
     return false;
 }
 
@@ -163,7 +176,7 @@ static inline bool axc_push(axchunk *c, void *item) {
  */
 static inline void *axc_pop(axchunk *c, void *dest) {
     if (c->len)
-        axc__quick_memmove__(dest, axc_index(c, --c->len), c->width);
+        axc__quick_memmove__(dest, axc__index__(c, --c->len), c->width);
     return dest;
 }
 
@@ -175,7 +188,7 @@ static inline void *axc_pop(axchunk *c, void *dest) {
  */
 static inline void *axc_top(axchunk *c, void *dest) {
     if (c->len)
-        axc__quick_memmove__(dest, axc_index(c, c->len - 1), c->width);
+        axc__quick_memmove__(dest, axc__index__(c, c->len - 1), c->width);
     return dest;
 }
 
@@ -188,7 +201,7 @@ static inline void *axc_top(axchunk *c, void *dest) {
  */
 static inline void *axc_get(axchunk *c, uint64_t i, void *dest) {
     if (i < c->len)
-        axc__quick_memmove__(dest, axc_index(c, i), c->width);
+        axc__quick_memmove__(dest, axc__index__(c, i), c->width);
     return dest;
 }
 
@@ -205,7 +218,7 @@ static inline bool axc_set(axchunk *c, uint64_t i, void *item) {
         return true;
     if (i == c->len)
         return axc_push(c, item);
-    axc__quick_memmove__(axc_index(c, i), item, c->width);
+    axc__quick_memmove__(axc__index__(c, i), item, c->width);
     return false;
 }
 
@@ -246,7 +259,12 @@ axchunk *axc_filter(axchunk *c, bool (*f)(const void *, void *), void *arg);
  */
 axchunk *axc_clear(axchunk *c);
 
+/**
+ * Remove the last n chunks from this axchunk and call the destructor on them if it is available.
+ * @param n Number of chunks to discard. This is automatically clamped to the number of chunks occupied.
+ * @return Self.
+ */
 axchunk *axc_discard(axchunk *c, uint64_t n);
 
-#undef axc_index
+#undef axc__index__
 #endif //AXCHUNK_AXCHUNK_H
