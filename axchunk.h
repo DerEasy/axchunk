@@ -17,7 +17,37 @@ typedef struct axchunk {
     uint64_t len;
     uint64_t cap;
     uint64_t width;
+    void (*destroy)(void *);
 } axchunk;
+
+/**
+ * This is an internal function to the axchunk library.
+ */
+static inline void *axc__quick_memcpy__(void *dst, void *src, size_t n) {
+    switch (n) {
+    case 1: return memcpy(dst, src, 1);
+    case 2: return memcpy(dst, src, 2);
+    case 4: return memcpy(dst, src, 4);
+    case 8: return memcpy(dst, src, 8);
+    case 12: return memcpy(dst, src, 12);
+    case 16: return memcpy(dst, src, 16);
+    default: return memcpy(dst, src, n);
+    }
+}
+
+/**
+ * This is an internal function to the axchunk library.
+ */
+static inline void *axc__quick_memmove__(void *dst, void *src, size_t n) {
+    switch (n) {
+    case 1: return memmove(dst, src, 1);
+    case 2: return memmove(dst, src, 2);
+    case 4: return memmove(dst, src, 4);
+    case 8: return memmove(dst, src, 8);
+    case 16: return memmove(dst, src, 16);
+    default: return memmove(dst, src, n);
+    }
+}
 
 /**
  * Creates a new axchunk with default capacity.
@@ -35,12 +65,9 @@ axchunk *axc_new(uint64_t width);
 axchunk *axc_newSized(uint64_t width, uint64_t size);
 
 /**
- * Destroy an axchunk.
+ * If a destructor is available, call it on each chunk. In any case, the axchunk is destroyed.
  */
-static inline void axc_destroy(axchunk *c) {
-    free(c->items);
-    free(c);
-}
+void axc_destroy(axchunk *c);
 
 /**
  * Sets a new capacity for the axchunk.
@@ -98,6 +125,25 @@ static inline void *axc_data(axchunk *c) {
 }
 
 /**
+ * Set destructor function. Type must match void (*)(void *). The destructor is passed a pointer to a chunk, but beware
+ * the pointed-to memory chunk has not itself been allocated separately.
+ * @param destroy Destructor or NULL to deactivate destructor features.
+ * @return Self.
+ */
+static inline axchunk *axc_setDestructor(axchunk *c, void (*destroy)(void *)) {
+    c->destroy = destroy;
+    return c;
+}
+
+/**
+ * Get destructor function. Type is void (*)(void *).
+ * @return Destructor or NULL if not set.
+ */
+static inline void (*axc_getDestructor(axchunk *c))(void *) {
+    return c->destroy;
+}
+
+/**
  * Push an item to the end of an axchunk. This operation may resize the axchunk.
  * @param item Pointer to item of chunk-width size to copy into axchunk.
  * @return True iff OOM, in which case nothing is done.
@@ -105,19 +151,31 @@ static inline void *axc_data(axchunk *c) {
 static inline bool axc_push(axchunk *c, void *item) {
     if (c->len >= c->cap && axc_resize(c, (c->cap << 1) | 1))
         return true;
-    memcpy(axc_index(c, c->len++), item, c->width);
+    axc__quick_memcpy__(axc_index(c, c->len++), item, c->width);
     return false;
 }
 
 /**
  * Pop the last item off the end of an axchunk. That item is subsequently removed. Nothing is done in the case there
- * are no chunks currently occupied.
+ * currently are no chunks occupied.
  * @param dest Pointer to buffer where the item will be written into.
  * @return The destination pointer.
  */
 static inline void *axc_pop(axchunk *c, void *dest) {
     if (c->len)
-        memmove(dest, axc_index(c, --c->len), c->width);
+        axc__quick_memmove__(dest, axc_index(c, --c->len), c->width);
+    return dest;
+}
+
+/**
+ * Get the last item off the end of an axchunk without removing it. Nothing is done in the case there currently are no
+ * chunks occupied.
+ * @param dest Pointer to buffer where the item will be written into.
+ * @return The destination pointer.
+ */
+static inline void *axc_top(axchunk *c, void *dest) {
+    if (c->len)
+        axc__quick_memmove__(dest, axc_index(c, c->len - 1), c->width);
     return dest;
 }
 
@@ -130,7 +188,7 @@ static inline void *axc_pop(axchunk *c, void *dest) {
  */
 static inline void *axc_get(axchunk *c, uint64_t i, void *dest) {
     if (i < c->len)
-        memmove(dest, axc_index(c, i), c->width);
+        axc__quick_memmove__(dest, axc_index(c, i), c->width);
     return dest;
 }
 
@@ -147,7 +205,7 @@ static inline bool axc_set(axchunk *c, uint64_t i, void *item) {
         return true;
     if (i == c->len)
         return axc_push(c, item);
-    memmove(axc_index(c, i), item, c->width);
+    axc__quick_memmove__(axc_index(c, i), item, c->width);
     return false;
 }
 
@@ -158,6 +216,37 @@ static inline bool axc_set(axchunk *c, uint64_t i, void *item) {
  * @return Self.
  */
 axchunk *axc_swap(axchunk *c, uint64_t i1, uint64_t i2);
+
+/**
+ * Let f be a function taking (pointer to chunk, optional argument).
+ * Call f(x, arg) on each chunk x until f returns false or all chunks of the axchunk have been exhausted.
+ * Chunks are iterated from first to last.
+ * @param f Function to call on all chunks.
+ * @param arg An optional argument passed to the function.
+ * @return Self.
+ */
+axchunk *axc_foreach(axchunk *c, bool (*f)(void *, void *), void *arg);
+
+/**
+ * Let f be a predicate taking (pointer to chunk, optional argument).
+ * Keep all chunks x in the axchunk that satisfy f(x, arg), remove all those that don't, and close the resulting
+ * gaps by contracting the space between all remaining chunks, thus preserving the relative order of the remaining
+ * chunks. If a destructor is set, it is called upon all removed chunks. The filter is applied linearly from first
+ * to last chunk. O(n).
+ * @param f Some predicate to filter the axchunk.
+ * @param arg An optional argument passed to the filter.
+ * @return Self.
+ */
+axchunk *axc_filter(axchunk *c, bool (*f)(const void *, void *), void *arg);
+
+/**
+ * Remove every chunk in this axchunk and set its length to zero. If a destructor is set, it is called upon
+ * each chunk.
+ * @return Self.
+ */
+axchunk *axc_clear(axchunk *c);
+
+axchunk *axc_discard(axchunk *c, uint64_t n);
 
 #undef axc_index
 #endif //AXCHUNK_AXCHUNK_H
