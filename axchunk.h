@@ -40,6 +40,8 @@ typedef struct axchunk {
     uint64_t cap;
     uint64_t width;
     void (*destroy)(void *);
+    void (*resizeEventHandler)(struct axchunk *, void *);
+    void *resizeEventArgs;
 } axchunk;
 
 /**
@@ -88,8 +90,9 @@ axchunk *axc_newSized(uint64_t width, uint64_t size);
 
 /**
  * If a destructor is available, call it on each chunk. In any case, the axchunk is destroyed.
+ * @return Returns its argument for resize events.
  */
-void axc_destroy(axchunk *c);
+void *axc_destroy(axchunk *c);
 
 /**
  * Sets a new capacity for the axchunk.
@@ -172,6 +175,34 @@ static inline axchunk *axc_setDestructor(axchunk *c, void (*destroy)(void *)) {
  */
 static inline void (*axc_getDestructor(axchunk *c))(void *) {
     return c->destroy;
+}
+
+/**
+ * Set a handler to call whenever axchunk is resized.
+ * @param handler Handler function taking the axchunk and optional arguments.
+ * @param args Optional arguments which are passed to the handler.
+ * @return Self.
+ */
+static inline axchunk *axc_setResizeEventHandler(axchunk *c, void (*handler)(axchunk *, void *), void *args) {
+    c->resizeEventHandler = handler;
+    c->resizeEventArgs = args;
+    return c;
+}
+
+/**
+ * Get this axchunk's resize event handler function.
+ * @return Resize event handler of type void (*)(axchunk *, void *).
+ */
+static inline void (*axc_getResizeEventHandler(axchunk *c))(axchunk *, void *) {
+    return c->resizeEventHandler;
+}
+
+/**
+ * Get this axchunk's optional argument to its resize event handler.
+ * @return Argument to resize event handler.
+ */
+static inline void *axc_getResizeEventArgs(axchunk *c) {
+    return c->resizeEventArgs;
 }
 
 /**

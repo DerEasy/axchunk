@@ -37,27 +37,33 @@ axchunk *axc_newSized(uint64_t width, uint64_t size) {
     c->cap = size;
     c->width = width;
     c->destroy = NULL;
+    c->resizeEventHandler = NULL;
     return c;
 }
 
-void axc_destroy(axchunk *c) {
+void *axc_destroy(axchunk *c) {
     if (c->destroy) {
         for (char *chunk = c->items; c->len; --c->len) {
             c->destroy(chunk);
             chunk += c->width;
         }
     }
+    void *resizeEventArgs = c->resizeEventArgs;
     free(c->items);
     free(c);
+    return resizeEventArgs;
 }
 
 bool axc_resize(axchunk *c, uint64_t size) {
     size += !size;
+    if (size == c->cap)
+        return false;
     void *items = realloc(c->items, size * c->width);
     if (!items)
         return true;
     c->items = items;
     c->cap = size;
+    c->resizeEventHandler(c, c->resizeEventArgs);
     return false;
 }
 
