@@ -11,12 +11,13 @@
 #include "axchunk.h"
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
+#define MAX(x,y) ((x) > (y) ? (x) : (y))
 
 /**
  * Same as axc_index, but without bounds checking.
  */
 static inline void *axc__index__(axchunk *c, uint64_t i) {
-    return (char *) c->items + i * c->width;
+    return (char *) c->chunks + i * c->width;
 }
 
 axchunk *axc_new(uint64_t width) {
@@ -28,8 +29,8 @@ axchunk *axc_newSized(uint64_t width, uint64_t size) {
     width += !width;
     axchunk *c = malloc(sizeof *c);
     if (c)
-        c->items = malloc(size * width);
-    if (!c || !c->items) {
+        c->chunks = malloc(size * width);
+    if (!c || !c->chunks) {
         free(c);
         return NULL;
     }
@@ -43,27 +44,33 @@ axchunk *axc_newSized(uint64_t width, uint64_t size) {
 
 void *axc_destroy(axchunk *c) {
     if (c->destroy) {
-        for (char *chunk = c->items; c->len; --c->len) {
+        for (char *chunk = c->chunks; c->len; --c->len) {
             c->destroy(chunk);
             chunk += c->width;
         }
     }
     void *resizeEventArgs = c->resizeEventArgs;
-    free(c->items);
+    free(c->chunks);
     free(c);
     return resizeEventArgs;
+}
+
+void *axc_destroySoft(axchunk *c) {
+    void *chunks = c->chunks;
+    free(c);
+    return chunks;
 }
 
 bool axc_resize(axchunk *c, uint64_t size) {
     size += !size;
     if (size == c->cap)
         return false;
-    intptr_t oldItems = (intptr_t) c->items;
-    void *items = realloc(c->items, size * c->width);
-    if (!items)
+    intptr_t oldChunks = (intptr_t) c->chunks;
+    void *chunks = realloc(c->chunks, size * c->width);
+    if (!chunks)
         return true;
-    ptrdiff_t offset = (intptr_t) items - oldItems;
-    c->items = items;
+    ptrdiff_t offset = (intptr_t) chunks - oldChunks;
+    c->chunks = chunks;
     c->cap = size;
     if (c->resizeEventHandler)
         c->resizeEventHandler(c, offset, c->resizeEventArgs);
@@ -95,7 +102,7 @@ axchunk *axc_swap(axchunk *c, uint64_t i1, uint64_t i2) {
 }
 
 axchunk *axc_foreach(axchunk *c, bool (*f)(void *, void *), void *arg) {
-    char *chunk = c->items;
+    char *chunk = c->chunks;
     for (uint64_t i = 0; i < c->len; ++i) {
         if (!f(chunk, arg))
             return c;
@@ -106,8 +113,8 @@ axchunk *axc_foreach(axchunk *c, bool (*f)(void *, void *), void *arg) {
 
 axchunk *axc_filter(axchunk *c, bool (*f)(const void *, void *), void *arg) {
     const bool shouldDestroy = c->destroy;
-    char *chunk = c->items;
-    char *filterChunk = c->items;
+    char *chunk = c->chunks;
+    char *filterChunk = c->chunks;
     for (uint64_t i = 0; i < c->len; ++i) {
         if (f(chunk, arg)) {
             if (chunk != filterChunk)
@@ -124,7 +131,7 @@ axchunk *axc_filter(axchunk *c, bool (*f)(const void *, void *), void *arg) {
 
 axchunk *axc_clear(axchunk *c) {
     if (c->destroy) {
-        for (char *chunk = c->items; c->len; --c->len) {
+        for (char *chunk = c->chunks; c->len; --c->len) {
             c->destroy(chunk);
             chunk += c->width;
         }
@@ -145,3 +152,10 @@ axchunk *axc_discard(axchunk *c, uint64_t n) {
     return c;
 }
 
+void *axc_internalCopy(axchunk *c) {
+    uint64_t size = MAX(c->len * c->width, 1);
+    void *copy = malloc(size);
+    if (!copy)
+        return NULL;
+    return memcpy(copy, c->chunks, size);
+}

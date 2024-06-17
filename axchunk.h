@@ -14,7 +14,7 @@
 /**
  * Same as axc_index, but without bounds checking.
  */
-#define axc__index__(c, i) (((char *) (c)->items + (i) * (c)->width))
+#define axc__index__(c, i) (((char *) (c)->chunks + (i) * (c)->width))
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -39,7 +39,7 @@
  * rely solely on the functions of the library.
  */
 typedef struct axchunk {
-    void *items;
+    void *chunks;
     uint64_t len;
     uint64_t cap;
     uint64_t width;
@@ -101,6 +101,13 @@ axchunk *axc_newSized(uint64_t width, uint64_t size);
 void *axc_destroy(axchunk *c);
 
 /**
+ * Soft destruction only destroys the axchunk object, but it does not free its internal array and it also does not
+ * call the attached destructor on any item. This is useful if you want to "convert" an axchunk to a normal array.
+ * @return The internal array which must be freed separately.
+ */
+void *axc_destroySoft(axchunk *c);
+
+/**
  * Sets a new capacity for the axchunk.
  * @param size Number of chunks this axchunk should be able to hold at maximum.
  * @return True iff OOM.
@@ -152,7 +159,7 @@ static inline uint64_t axc_width(axchunk *c) {
  * @return Internal array of this axchunk.
  */
 static inline void *axc_data(axchunk *c) {
-    return c->items;
+    return c->chunks;
 }
 
 /**
@@ -161,7 +168,7 @@ static inline void *axc_data(axchunk *c) {
  * @return Pointer to chunk or NULL if index out of range.
  */
 static inline void *axc_index(axchunk *c, uint64_t i) {
-    return i < c->len ? (char *) c->items + i * c->width : NULL;
+    return i < c->len ? (char *) c->chunks + i * c->width : NULL;
 }
 
 /**
@@ -330,6 +337,13 @@ axchunk *axc_clear(axchunk *c);
  * @return Self.
  */
 axchunk *axc_discard(axchunk *c, uint64_t n);
+
+/**
+ * Creates a copy of the internal array that is just large enough to hold every occupied chunk. The returned pointer
+ * needs to be freed separately.
+ * @return Copy of internal array or NULL iff OOM.
+ */
+void *axc_internalCopy(axchunk *c);
 
 #undef axc__index__
 #endif //AXCHUNK_AXCHUNK_H
