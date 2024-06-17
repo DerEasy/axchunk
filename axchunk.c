@@ -159,3 +159,33 @@ void *axc_internalCopy(axchunk *c) {
         return NULL;
     return memcpy(copy, c->chunks, size);
 }
+
+
+bool axc_write(axchunk *c, uint64_t i, void *chunks, uint64_t chkcount) {
+    if (i + chkcount > c->cap) {
+        uint64_t size1 = (c->cap << 1) | 1;
+        uint64_t size2 = i + chkcount;
+        if (axc_resize(c, MAX(size1, size2)))
+            return true;
+    }
+    if (c->destroy) {
+        char *chunk = axc__index__(c, i);
+        for (uint64_t k = 0; k < chkcount && k + i < c->len; ++k) {
+            c->destroy(chunk);
+            chunk += c->width;
+        }
+    }
+    axc__quick_memmove__(axc__index__(c, i), chunks, chkcount * c->width);
+    c->len = MAX(i + chkcount, c->len);
+    return false;
+}
+
+
+uint64_t axc_read(axchunk *c, uint64_t i, void *chunks, uint64_t chkcount) {
+    if (i >= c->len)
+        return 0;
+    if (i + chkcount > c->len)
+        chkcount -= i + chkcount - c->len;
+    axc__quick_memmove__(chunks, axc__index__(c, i), chkcount * c->width);
+    return chkcount;
+}

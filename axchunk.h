@@ -345,5 +345,26 @@ axchunk *axc_discard(axchunk *c, uint64_t n);
  */
 void *axc_internalCopy(axchunk *c);
 
+/**
+ * Write an arbitrary amount of chunks into an axchunk at some index. If the requested chunks to be overwritten
+ * don't exist, the axchunk is resized appropriately.
+ * @param i Index at which to start overwriting chunks.
+ * @param chunks Chunk source.
+ * @param chkcount Number of chunks to copy.
+ * @return True iff OOM.
+ */
+bool axc_write(axchunk *c, uint64_t i, void *chunks, uint64_t chkcount);
+
+/**
+ * Read an arbitrary amount of chunks from an axchunk at some index. If the requested chunks are unoccupied or don't
+ * exist, less than the specified amount of chunks will be copied. On a successful call the return value should
+ * therefore match the passed chkcount value.
+ * @param i Index at which to start copying chunks.
+ * @param chunks Chunk destination.
+ * @param chkcount Number of chunks to copy.
+ * @return The actual amount of chunks read. Should equal the passed count if it didn't exceed the axchunk's bounds.
+ */
+uint64_t axc_read(axchunk *c, uint64_t i, void *chunks, uint64_t chkcount);
+
 #undef axc__index__
 #endif //AXCHUNK_AXCHUNK_H
