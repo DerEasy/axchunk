@@ -50,8 +50,9 @@ typedef struct axchunk {
 
 /**
  * This is an internal function of the axchunk library.
+ * memcpy optimised for sizes of 1, 2, 4, 8, 12 and 16.
  */
-static inline void *axc__quick_memcpy__(void *dst, void *src, size_t n) {
+static void *axc__quick_memcpy__(void *dst, void *src, size_t n) {
     switch (n) {
     case 1: return memcpy(dst, src, 1);
     case 2: return memcpy(dst, src, 2);
@@ -65,8 +66,9 @@ static inline void *axc__quick_memcpy__(void *dst, void *src, size_t n) {
 
 /**
  * This is an internal function of the axchunk library.
+ * memmove optimised for sizes of powers of two upto 16.
  */
-static inline void *axc__quick_memmove__(void *dst, void *src, size_t n) {
+static void *axc__quick_memmove__(void *dst, void *src, size_t n) {
     switch (n) {
     case 1: return memmove(dst, src, 1);
     case 2: return memmove(dst, src, 2);

@@ -20,7 +20,7 @@ static inline void *axc__index__(axchunk *c, uint64_t i) {
 }
 
 axchunk *axc_new(uint64_t width) {
-    return axc_newSized(width, 8);
+    return axc_newSized(width, 7);
 }
 
 axchunk *axc_newSized(uint64_t width, uint64_t size) {
