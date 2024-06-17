@@ -65,7 +65,8 @@ bool axc_resize(axchunk *c, uint64_t size) {
     ptrdiff_t offset = (intptr_t) items - oldItems;
     c->items = items;
     c->cap = size;
-    c->resizeEventHandler(c, offset, c->resizeEventArgs);
+    if (c->resizeEventHandler)
+        c->resizeEventHandler(c, offset, c->resizeEventArgs);
     return false;
 }
 
@@ -96,9 +97,8 @@ axchunk *axc_swap(axchunk *c, uint64_t i1, uint64_t i2) {
 axchunk *axc_foreach(axchunk *c, bool (*f)(void *, void *), void *arg) {
     char *chunk = c->items;
     for (uint64_t i = 0; i < c->len; ++i) {
-        if (!f(chunk, arg)) {
+        if (!f(chunk, arg))
             return c;
-        }
         chunk += c->width;
     }
     return c;
