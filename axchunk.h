@@ -346,6 +346,13 @@ axchunk *axc_discard(axchunk *c, uint64_t n);
 void *axc_internalCopy(axchunk *c);
 
 /**
+ * Create a copy of an axchunk. The destructor, the resize handler and its argument are not copied along. The copy will
+ * have the same capacity as the original.
+ * @return Copy of axchunk or NULL iff OOM.
+ */
+axchunk *axc_copy(axchunk *c);
+
+/**
  * Write an arbitrary amount of chunks into an axchunk at some index. If the requested chunks to be overwritten
  * don't exist, the axchunk is resized appropriately.
  * @param i Index at which to start overwriting chunks.

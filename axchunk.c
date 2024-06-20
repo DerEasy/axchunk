@@ -160,6 +160,14 @@ void *axc_internalCopy(axchunk *c) {
     return memcpy(copy, c->chunks, size);
 }
 
+axchunk *axc_copy(axchunk *c) {
+    axchunk *copy = axc_newSized(c->width, c->cap);
+    if (!copy)
+        return NULL;
+    memcpy(copy->chunks, c->chunks, c->width * c->len);
+    copy->len = c->len;
+    return copy;
+}
 
 bool axc_write(axchunk *c, uint64_t i, void *chunks, uint64_t chkcount) {
     if (i + chkcount > c->cap) {
