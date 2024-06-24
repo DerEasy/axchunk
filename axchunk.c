@@ -13,11 +13,21 @@
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 
+static void *(*malloc_)(size_t) = malloc;
+static void *(*realloc_)(void *, size_t) = realloc;
+static void (*free_)(void *) = free;
+
 /**
  * Same as axc_index, but without bounds checking.
  */
 static inline void *axc__index__(axchunk *c, uint64_t i) {
     return (char *) c->chunks + i * c->width;
+}
+
+void axc_memoryfn(void *(*malloc_fn)(size_t), void *(*realloc_fn)(void *, size_t), void (*free_fn)(void *)) {
+    malloc_ = malloc_fn ? malloc_fn : malloc;
+    realloc_ = realloc_fn ? realloc_fn : realloc;
+    free_ = free_fn ? free_fn : free;
 }
 
 axchunk *axc_new(uint64_t width) {
@@ -27,11 +37,11 @@ axchunk *axc_new(uint64_t width) {
 axchunk *axc_newSized(uint64_t width, uint64_t size) {
     size += !size;
     width += !width;
-    axchunk *c = malloc(sizeof *c);
+    axchunk *c = malloc_(sizeof *c);
     if (c)
-        c->chunks = malloc(size * width);
+        c->chunks = malloc_(size * width);
     if (!c || !c->chunks) {
-        free(c);
+        free_(c);
         return NULL;
     }
     c->len = 0;
@@ -50,14 +60,14 @@ void *axc_destroy(axchunk *c) {
         }
     }
     void *resizeEventArgs = c->resizeEventArgs;
-    free(c->chunks);
-    free(c);
+    free_(c->chunks);
+    free_(c);
     return resizeEventArgs;
 }
 
 void *axc_destroySoft(axchunk *c) {
     void *chunks = c->chunks;
-    free(c);
+    free_(c);
     return chunks;
 }
 
@@ -66,7 +76,7 @@ bool axc_resize(axchunk *c, uint64_t size) {
     if (size == c->cap)
         return false;
     intptr_t oldChunks = (intptr_t) c->chunks;
-    void *chunks = realloc(c->chunks, size * c->width);
+    void *chunks = realloc_(c->chunks, size * c->width);
     if (!chunks)
         return true;
     ptrdiff_t offset = (intptr_t) chunks - oldChunks;
@@ -154,7 +164,7 @@ axchunk *axc_discard(axchunk *c, uint64_t n) {
 
 void *axc_internalCopy(axchunk *c) {
     uint64_t size = MAX(c->len * c->width, 1);
-    void *copy = malloc(size);
+    void *copy = malloc_(size);
     if (!copy)
         return NULL;
     return memcpy(copy, c->chunks, size);

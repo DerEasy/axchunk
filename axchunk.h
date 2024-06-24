@@ -80,6 +80,15 @@ static void *axc__quick_memmove__(void *dst, void *src, size_t n) {
 }
 
 /**
+ * Set custom memory functions. All three of them must be set and be compatible with one another.
+ * Passing NULL for any function will activate its standard library counterpart.
+ * @param malloc_fn The malloc function.
+ * @param realloc_fn The realloc function.
+ * @param free_fn The free function.
+ */
+void axc_memoryfn(void *(*malloc_fn)(size_t), void *(*realloc_fn)(void *, size_t), void (*free_fn)(void *));
+
+/**
  * Creates a new axchunk with default capacity.
  * @param width Size of individual chunks.
  * @return New axchunk or NULL iff OOM.
