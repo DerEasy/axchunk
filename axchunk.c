@@ -49,6 +49,7 @@ axchunk *axc_newSized(uint64_t width, uint64_t size) {
     c->width = width;
     c->destroy = NULL;
     c->resizeEventHandler = NULL;
+    c->context = NULL;
     return c;
 }
 
@@ -59,10 +60,10 @@ void *axc_destroy(axchunk *c) {
             chunk += c->width;
         }
     }
-    void *resizeEventArgs = c->resizeEventArgs;
+    void *context = c->context;
     free_(c->chunks);
     free_(c);
-    return resizeEventArgs;
+    return context;
 }
 
 void *axc_destroySoft(axchunk *c) {
@@ -83,7 +84,7 @@ bool axc_resize(axchunk *c, uint64_t size) {
     c->chunks = chunks;
     c->cap = size;
     if (c->resizeEventHandler)
-        c->resizeEventHandler(c, offset, c->resizeEventArgs);
+        c->resizeEventHandler(c, offset);
     return false;
 }
 
